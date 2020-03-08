@@ -1,4 +1,5 @@
 use multihash::*;
+use std::convert::TryFrom;
 
 /// Helper function to convert a hex-encoded byte array back into a bytearray
 fn hex_to_bytes(s: &str) -> Vec<u8> {
@@ -16,7 +17,7 @@ macro_rules! assert_encode {
         $(
             let hex = hex_to_bytes($expect);
             assert_eq!(
-                <$alg>::digest($data).into_bytes(),
+                <Vec<u8>>::from(<$alg>::digest($data)),
                 hex,
                 "{:?} encodes correctly", stringify!($alg)
             );
@@ -24,7 +25,7 @@ macro_rules! assert_encode {
             let mut hasher = <$alg>::default();
             &mut hasher.input($data);
             assert_eq!(
-                hasher.result().into_bytes(),
+                <Vec<u8>>::from(hasher.result()),
                 hex,
                 "{:?} encodes correctly", stringify!($alg)
             );
@@ -97,7 +98,7 @@ macro_rules! assert_roundtrip {
     ($( $alg:ident ),*) => {
         $(
             {
-                let hash: Vec<u8> = $alg::digest(b"helloworld").into_bytes();
+                let hash: Vec<u8> = $alg::digest(b"helloworld").into();
                 assert_eq!(
                     MultihashRef::from_slice(&hash).unwrap().algorithm(),
                     $alg::CODE
@@ -106,7 +107,7 @@ macro_rules! assert_roundtrip {
             {
                 let mut hasher = $alg::default();
                 &mut hasher.input(b"helloworld");
-                let hash: Vec<u8> = hasher.result().into_bytes();
+                let hash: Vec<u8> = hasher.result().into();
                 assert_eq!(
                     MultihashRef::from_slice(&hash).unwrap().algorithm(),
                     $alg::CODE
@@ -129,7 +130,7 @@ fn test_methods(hash: impl MultihashDigest, prefix: &str, digest: &str) {
     let expected_bytes = hex_to_bytes(&format!("{}{}", prefix, digest));
     let multihash = hash.digest(b"hello world");
     assert_eq!(
-        Multihash::from_bytes(expected_bytes.clone()).unwrap(),
+        Multihash::try_from(expected_bytes.clone()).unwrap(),
         multihash
     );
     assert_eq!(multihash.as_bytes(), &expected_bytes[..]);
@@ -149,7 +150,7 @@ fn test_methods(hash: impl MultihashDigest, prefix: &str, digest: &str) {
 
     let multihash_clone = multihash_ref.to_owned();
     assert_eq!(multihash, multihash_clone);
-    assert_eq!(multihash.into_bytes(), &expected_bytes[..]);
+    assert_eq!(multihash.as_bytes(), &expected_bytes[..]);
 }
 
 #[test]
@@ -252,25 +253,25 @@ fn custom_multihash() {
 #[test]
 fn multihash_errors() {
     assert!(
-        Multihash::from_bytes(Vec::new()).is_err(),
+        Multihash::try_from(Vec::new()).is_err(),
         "Should error on empty data"
     );
     assert!(
-        Multihash::from_bytes(vec![1, 2, 3]).is_err(),
+        Multihash::try_from(vec![1, 2, 3]).is_err(),
         "Should error on invalid multihash"
     );
     assert!(
-        Multihash::from_bytes(vec![1, 2, 3]).is_err(),
+        Multihash::try_from(vec![1, 2, 3]).is_err(),
         "Should error on invalid prefix"
     );
     assert!(
-        Multihash::from_bytes(vec![0x12, 0x20, 0xff]).is_err(),
+        Multihash::try_from(vec![0x12, 0x20, 0xff]).is_err(),
         "Should error on correct prefix with wrong digest"
     );
     let identity_code = <u64>::from(Identity::CODE) as u8;
     let identity_length = 3;
     assert!(
-        Multihash::from_bytes(vec![identity_code, identity_length, 1, 2, 3, 4]).is_err(),
+        Multihash::try_from(vec![identity_code, identity_length, 1, 2, 3, 4]).is_err(),
         "Should error on wrong hash length"
     );
 }

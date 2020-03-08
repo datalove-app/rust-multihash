@@ -36,40 +36,7 @@ impl hash::Hash for Multihash {
 }
 
 impl Multihash {
-    /// Creates a new `Multihash` from a `Vec<u8>`, consuming it.
-    /// If the input data is not a valid multihash an error is returned.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use multihash::{Sha2_256, Multihash};
-    ///
-    /// let mh = Sha2_256::digest(b"hello world");
-    ///
-    /// // valid multihash
-    /// let mh2 = Multihash::from_bytes(mh.into_bytes()).unwrap();
-    ///
-    /// // invalid multihash
-    /// assert!(Multihash::from_bytes(vec![1,2,3]).is_err());
-    /// ```
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Multihash, DecodeOwnedError> {
-        if let Err(err) = MultihashRef::from_slice(&bytes) {
-            return Err(DecodeOwnedError {
-                error: err,
-                data: bytes,
-            });
-        }
-        Ok(Multihash {
-            storage: Storage::from_slice(&bytes),
-        })
-    }
-
-    /// Returns the bytes representation of the multihash.
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.to_vec()
-    }
-
-    /// Returns the bytes representation of the multihash.
+    /// Returns an owned byte representation of the multihash.
     pub fn to_vec(&self) -> Vec<u8> {
         Vec::from(self.as_bytes())
     }
@@ -106,6 +73,42 @@ impl Multihash {
     }
 }
 
+/// Creates a new `Multihash` from a `Vec<u8>`, consuming it.
+/// If the input data is not a valid multihash an error is returned.
+///
+/// # Example
+///
+/// ```
+/// use multihash::{Sha2_256, Multihash};
+///
+/// let mh = Sha2_256::digest(b"hello world");
+///
+/// // valid multihash
+/// let mh2 = Multihash::from_bytes(mh.into_bytes()).unwrap();
+///
+/// // invalid multihash
+/// assert!(Multihash::from_bytes(vec![1,2,3]).is_err());
+/// ```
+impl TryFrom<Vec<u8>> for Multihash {
+    type Error = DecodeOwnedError;
+
+    fn try_from(data: Vec<u8>) -> Result<Self, Self::Error> {
+        if let Err(error) = MultihashRef::from_slice(&data) {
+            Err(DecodeOwnedError { error, data })
+        } else {
+            Ok(Multihash {
+                storage: Storage::from_slice(&data),
+            })
+        }
+    }
+}
+
+impl From<Multihash> for Vec<u8> {
+    fn from(mh: Multihash) -> Self {
+        mh.to_vec()
+    }
+}
+
 impl AsRef<[u8]> for Multihash {
     fn as_ref(&self) -> &[u8] {
         self.as_bytes()
@@ -129,20 +132,6 @@ impl Borrow<[u8]> for Multihash {
 impl<'a> PartialEq<MultihashRef<'a>> for Multihash {
     fn eq(&self, other: &MultihashRef<'a>) -> bool {
         &*self.as_bytes() == other.as_bytes()
-    }
-}
-
-impl TryFrom<Vec<u8>> for Multihash {
-    type Error = DecodeOwnedError;
-
-    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        Multihash::from_bytes(value)
-    }
-}
-
-impl Into<Vec<u8>> for Multihash {
-    fn into(self) -> Vec<u8> {
-        self.to_vec()
     }
 }
 
